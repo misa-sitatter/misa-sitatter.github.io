@@ -21,11 +21,10 @@
     margin: 15px;
   }
   canvas {
-    background-color: rgba(255,182,193,0.3); /* softer pink grid bg */
+    background-color: rgba(255,255,255,0.2);
     border-radius: 10px;
     max-width: 95vw;
     max-height: 80vh;
-    touch-action: none; /* allows touch drag */
   }
   .charCard {
     display: inline-block;
@@ -60,8 +59,6 @@
 const canvas = document.getElementById('chart');
 const ctx = canvas.getContext('2d');
 let characters = [];
-let draggingChar = null;
-let dragOffsetX = 0;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth * 0.95;
@@ -78,7 +75,7 @@ document.getElementById('addBtn').addEventListener('click', () => {
   if (!file || !name || !height) return;
   const img = new Image();
   img.onload = () => {
-    characters.push({img, name, height, x: 50});
+    characters.push({img, name, height});
     updateCharacterList();
     draw();
   };
@@ -169,63 +166,19 @@ function draw() {
   const tallest = Math.max(...characters.map(c => c.height));
   const maxHeight = tallest + 20;
   drawGrid(maxHeight);
+  let x = 50;
   characters.forEach(char => {
     const scale = (canvas.height * 0.7 * (char.height / maxHeight)) / char.img.height;
     const w = char.img.width * scale;
     const h = char.img.height * scale;
-    ctx.drawImage(char.img, char.x, canvas.height - h - 30, w, h);
+    ctx.drawImage(char.img, x, canvas.height - h - 30, w, h);
     ctx.font = '20px Arial';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
-    ctx.fillText(char.name, char.x + w / 2, canvas.height - h - 40);
-    char._w = w;
-    char._h = h;
+    ctx.fillText(char.name, x + w / 2, canvas.height - h - 40);
+    x += w + 20;
   });
 }
-
-// Mouse + touch drag logic
-function getCharAt(x, y) {
-  return characters.find(char => {
-    return x >= char.x && x <= char.x + char._w &&
-           y >= canvas.height - char._h - 30 && y <= canvas.height - 30;
-  });
-}
-
-function startDrag(x, y) {
-  const char = getCharAt(x, y);
-  if (char) {
-    draggingChar = char;
-    dragOffsetX = x - char.x;
-  }
-}
-
-function moveDrag(x) {
-  if (draggingChar) {
-    draggingChar.x = x - dragOffsetX;
-    draw();
-  }
-}
-
-function endDrag() {
-  draggingChar = null;
-}
-
-canvas.addEventListener('mousedown', e => startDrag(e.offsetX, e.offsetY));
-canvas.addEventListener('mousemove', e => moveDrag(e.offsetX));
-canvas.addEventListener('mouseup', endDrag);
-
-canvas.addEventListener('touchstart', e => {
-  const touch = e.touches[0];
-  const rect = canvas.getBoundingClientRect();
-  startDrag(touch.clientX - rect.left, touch.clientY - rect.top);
-});
-canvas.addEventListener('touchmove', e => {
-  const touch = e.touches[0];
-  const rect = canvas.getBoundingClientRect();
-  moveDrag(touch.clientX - rect.left);
-});
-canvas.addEventListener('touchend', endDrag);
-
 </script>
 </body>
 </html>
