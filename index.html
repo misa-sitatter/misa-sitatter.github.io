@@ -2,122 +2,98 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MISA-SITATTER</title>
 <style>
   body {
-    margin: 0;
     font-family: Arial, sans-serif;
-    background: linear-gradient(to bottom, #ffe6f1, #ffd1e8);
-    color: #333;
+    text-align: center;
+    background-color: #ffb6c1;
+    color: white;
+    margin: 0;
+    overflow-x: hidden;
   }
   h1 {
-    text-align: center;
-    color: #ff5ca2;
+    margin-top: 20px;
+    font-size: 2em;
+    text-shadow: 2px 2px #ff69b4;
   }
-  #controls {
-    padding: 10px;
-    background: rgba(255, 240, 246, 0.9);
-  }
-  #characterList {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
-  }
-  .charCard {
-    background: #fff0f6;
-    border: 2px solid #ff9ec9;
-    padding: 5px;
-    border-radius: 10px;
-    width: 150px;
-  }
-  .charCard input {
-    width: 100%;
-    margin-bottom: 5px;
+  #controls, #characterList {
+    margin: 15px;
   }
   canvas {
+    background-color: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    max-width: 95vw;
+    max-height: 80vh;
+    touch-action: none; /* Prevent scrolling when dragging */
+  }
+  .charCard {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 10px;
+    margin: 5px;
+    border-radius: 8px;
+  }
+  .charCard img {
     display: block;
+    max-width: 80px;
     margin: auto;
-    background-color: transparent;
-    touch-action: none;
+  }
+  .charCard input[type="text"], .charCard input[type="number"] {
+    width: 80px;
+    margin-top: 5px;
+    text-align: center;
   }
 </style>
 </head>
 <body>
 <h1>MISA-SITATTER</h1>
 <div id="controls">
-  <input type="file" id="imageUpload">
-  <input type="text" id="nameInput" placeholder="Name">
-  <input type="number" id="heightInput" placeholder="Height (cm)">
+  <input type="file" id="fileInput" accept="image/png"><br><br>
+  <input type="text" id="nameInput" placeholder="Name"><br><br>
+  <input type="number" id="heightInput" placeholder="Height (cm)"><br><br>
   <button id="addBtn">Add Character</button>
-  <div id="characterList"></div>
 </div>
 <canvas id="chart"></canvas>
+<div id="characterList"></div>
 <script>
 const canvas = document.getElementById('chart');
 const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = true;
+ctx.imageSmoothingQuality = 'high';
+
 let characters = [];
-let tallestHeight = 0;
-let draggingChar = null;
-let offsetX = 0;
-let offsetY = 0;
+let offsetX = 0;      // Horizontal scroll offset
+let isDragging = false;
+let dragStartX = 0;
+let scrollStartX = 0;
 
 function resizeCanvas() {
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = window.innerWidth * ratio;
-  canvas.height = (window.innerHeight - document.getElementById('controls').offsetHeight) * ratio;
-  canvas.style.width = window.innerWidth + 'px';
-  canvas.style.height = (window.innerHeight - document.getElementById('controls').offsetHeight) + 'px';
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const scale = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * 0.95 * scale;
+  canvas.height = window.innerHeight * 0.8 * scale;
+  canvas.style.width = window.innerWidth * 0.95 + "px";
+  canvas.style.height = window.innerHeight * 0.8 + "px";
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   draw();
 }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-function drawGrid() {
-  ctx.font = '12px Arial';
-  ctx.fillStyle = '#ff5ca2';
-  ctx.textAlign = 'right';
-  ctx.strokeStyle = '#ffc1d9';
-  ctx.lineWidth = 1;
-  for (let cm = 0; cm <= tallestHeight + 20; cm += 5) {
-    let y = canvas.height / (window.devicePixelRatio || 1) - cm * 3; // 3px per cm
-    ctx.beginPath();
-    ctx.moveTo(30, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.strokeStyle = (cm % 10 === 0) ? '#ff8cb8' : '#ffd6e6';
-    ctx.stroke();
-    ctx.fillText(cm, 25, y + 3);
-  }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawGrid();
-  characters.forEach(char => {
-    if (!char.img) return;
-    const scale = char.height / char.img.naturalHeight;
-    const displayHeight = char.height * 3; // px scale
-    const displayWidth = char.img.naturalWidth * (displayHeight / char.img.naturalHeight);
-    ctx.drawImage(char.img, char.x, canvas.height/(window.devicePixelRatio||1) - displayHeight, displayWidth, displayHeight);
-    ctx.fillStyle = '#ff5ca2';
-    ctx.textAlign = 'center';
-    ctx.fillText(char.name, char.x + displayWidth / 2, canvas.height/(window.devicePixelRatio||1) - displayHeight - 5);
-  });
-}
-
-function updateTallest() {
-  tallestHeight = Math.max(...characters.map(c => c.height), 0);
-}
-
-function addCharacter(img, name, height) {
-  const char = {
-    img, name, height,
-    x: characters.length * 100 + 50
+document.getElementById('addBtn').addEventListener('click', () => {
+  const file = document.getElementById('fileInput').files[0];
+  const name = document.getElementById('nameInput').value;
+  const height = parseFloat(document.getElementById('heightInput').value);
+  if (!file || !name || !height) return;
+  const img = new Image();
+  img.onload = () => {
+    characters.push({img, name, height});
+    updateCharacterList();
+    draw();
   };
-  characters.push(char);
-  updateTallest();
-  updateCharacterList();
-  draw();
-}
+  img.src = URL.createObjectURL(file);
+});
 
 function updateCharacterList() {
   const list = document.getElementById('characterList');
@@ -125,84 +101,127 @@ function updateCharacterList() {
   characters.forEach((char, index) => {
     const card = document.createElement('div');
     card.className = 'charCard';
+
+    const imgEl = document.createElement('img');
+    imgEl.src = char.img.src;
+    card.appendChild(imgEl);
+
     const nameInput = document.createElement('input');
+    nameInput.type = 'text';
     nameInput.value = char.name;
-    nameInput.oninput = e => { char.name = e.target.value; draw(); };
+    nameInput.addEventListener('input', e => {
+      char.name = e.target.value;
+      draw();
+    });
+    card.appendChild(nameInput);
+
     const heightInput = document.createElement('input');
     heightInput.type = 'number';
     heightInput.value = char.height;
-    heightInput.oninput = e => { char.height = parseFloat(e.target.value) || 0; updateTallest(); draw(); };
-    const imgInput = document.createElement('input');
-    imgInput.type = 'file';
-    imgInput.onchange = e => {
+    heightInput.addEventListener('input', e => {
+      char.height = parseFloat(e.target.value) || char.height;
+      draw();
+    });
+    card.appendChild(heightInput);
+
+    const changeImg = document.createElement('input');
+    changeImg.type = 'file';
+    changeImg.accept = 'image/png';
+    changeImg.addEventListener('change', e => {
       const file = e.target.files[0];
-      if (!file) return;
-      const newImg = new Image();
-      newImg.onload = () => { char.img = newImg; draw(); };
-      newImg.src = URL.createObjectURL(file);
-    };
+      if (file) {
+        const newImg = new Image();
+        newImg.onload = () => {
+          char.img = newImg;
+          draw();
+          updateCharacterList();
+        };
+        newImg.src = URL.createObjectURL(file);
+      }
+    });
+    card.appendChild(changeImg);
+
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Delete';
-    delBtn.onclick = () => { characters.splice(index, 1); updateTallest(); updateCharacterList(); draw(); };
-    card.append(nameInput, heightInput, imgInput, delBtn);
+    delBtn.addEventListener('click', () => {
+      characters.splice(index, 1);
+      updateCharacterList();
+      draw();
+    });
+    card.appendChild(delBtn);
+
     list.appendChild(card);
   });
 }
 
-let upload = document.getElementById('imageUpload');
-document.getElementById('addBtn').onclick = () => {
-  const name = document.getElementById('nameInput').value || 'Unnamed';
-  const height = parseFloat(document.getElementById('heightInput').value) || 0;
-  const file = upload.files[0];
-  if (!file) return;
-  const img = new Image();
-  img.onload = () => { addCharacter(img, name, height); };
-  img.src = URL.createObjectURL(file);
-};
-
-canvas.addEventListener('mousedown', startDrag);
-canvas.addEventListener('touchstart', startDrag);
-canvas.addEventListener('mousemove', drag);
-canvas.addEventListener('touchmove', drag);
-canvas.addEventListener('mouseup', endDrag);
-canvas.addEventListener('touchend', endDrag);
-
-function getCharAtPos(x, y) {
-  return characters.find(char => {
-    const displayHeight = char.height * 3;
-    const displayWidth = char.img.naturalWidth * (displayHeight / char.img.naturalHeight);
-    return x >= char.x && x <= char.x + displayWidth &&
-           y >= canvas.height/(window.devicePixelRatio||1) - displayHeight && y <= canvas.height/(window.devicePixelRatio||1);
-  });
-}
-
-function startDrag(e) {
-  e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-  const char = getCharAtPos(x, y);
-  if (char) {
-    draggingChar = char;
-    offsetX = x - char.x;
+function drawGrid(maxHeight) {
+  const pxPerCm = (canvas.height * 0.7) / maxHeight;
+  ctx.lineWidth = 1;
+  for (let cm = 0; cm <= maxHeight; cm += 5) {
+    const y = canvas.height - (cm * pxPerCm) - 30;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.strokeStyle = (cm % 10 === 0) ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.4)';
+    ctx.stroke();
+    if (cm % 10 === 0) {
+      ctx.fillStyle = 'white';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(cm + ' cm', 5, y - 2);
+    }
   }
 }
 
-function drag(e) {
-  if (!draggingChar) return;
-  e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  draggingChar.x = x - offsetX;
-  draw();
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (characters.length === 0) return;
+  const tallest = Math.max(...characters.map(c => c.height));
+  const maxHeight = tallest + 20;
+  drawGrid(maxHeight);
+  let x = 50 + offsetX;
+  characters.forEach(char => {
+    const scale = (canvas.height * 0.7 * (char.height / maxHeight)) / char.img.height;
+    const w = char.img.width * scale;
+    const h = char.img.height * scale;
+    ctx.drawImage(char.img, x, canvas.height - h - 30, w, h);
+    ctx.font = '20px Arial';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText(char.name, x + w / 2, canvas.height - h - 40);
+    x += w + 20;
+  });
 }
 
-function endDrag() {
-  draggingChar = null;
-}
+// Mouse drag
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  dragStartX = e.clientX;
+  scrollStartX = offsetX;
+});
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (isDragging) {
+    offsetX = scrollStartX + (e.clientX - dragStartX);
+    draw();
+  }
+});
 
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+// Touch drag
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    dragStartX = e.touches[0].clientX;
+    scrollStartX = offsetX;
+  }
+});
+canvas.addEventListener('touchend', () => isDragging = false);
+canvas.addEventListener('touchmove', e => {
+  if (isDragging && e.touches.length === 1) {
+    offsetX = scrollStartX + (e.touches[0].clientX - dragStartX);
+    draw();
+  }
+});
 </script>
 </body>
 </html>
